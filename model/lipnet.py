@@ -1,5 +1,5 @@
 from keras.models import Sequential,Model
-from keras.layers import Input, Dense, Activation, Dropout, Convolution3D, MaxPooling3D, Flatten,ZeroPadding3D, TimeDistributed, SpatialDropout3D,BatchNormalization,Lambda
+from keras.layers import Input, Dense, Activation, Dropout, Convolution3D, MaxPooling3D, Flatten,ZeroPadding3D, TimeDistributed, SpatialDropout3D,BatchNormalization,Lambda,GRU,merge
 from keras.preprocessing.image import ImageDataGenerator
 from keras.utils import np_utils
 from keras.optimizers import Adam
@@ -99,11 +99,18 @@ class ModelLipNet(object):
 
         stcnn3_maxpool_flatten = TimeDistributed(Flatten())(stcnn3_maxpool)
         #Bi-GRU-1
-        bigru1 = BiGRU(stcnn3_maxpool_flatten, 512)
+        #bigru1 = BiGRU(stcnn3_maxpool_flatten, 512)
+        gru_1 = GRU(256, return_sequences=True, name='gru1')(stcnn3_maxpool_flatten)
+        gru_1b = GRU(256, return_sequences=True, go_backwards=True, name='gru1_b')(stcnn3_maxpool_flatten)
+        gru1_merged = merge([gru_1, gru_1b], mode='concat', concat_axis=2)
         #Bi-GRU-2
-        bigru2 = BiGRU(bigru1, 512)
+        #bigru2 = BiGRU(bigru1, 512)
+        gru_2 = GRU(256, return_sequences=True, name='gru2')(gru1_merged)
+        gru_2b = GRU(256, return_sequences=True, go_backwards=True, name='gru2_b')(gru1_merged)
+        gru2_merged = merge([gru_2, gru_2b], mode='concat', concat_axis=2)
 
         #fc linear layer
+        #li = TimeDistributed(Dense(28))(gru2_merged)
         li = TimeDistributed(Dense(28))(stcnn3_maxpool_flatten)
 
         #flatten and to 0-9
