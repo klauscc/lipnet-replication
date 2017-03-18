@@ -98,38 +98,38 @@ class ModelLipNet(object):
         stcnn3_maxpool = MaxPooling3D(pool_size=(1, 2, 2), strides=(1, 2, 2))(stcnn2_dp)
 
         stcnn3_maxpool_flatten = TimeDistributed(Flatten())(stcnn3_maxpool)
-        #Bi-GRU-1
-        #bigru1 = BiGRU(stcnn3_maxpool_flatten, 512)
-        gru_1 = GRU(256, return_sequences=True, name='gru1')(stcnn3_maxpool_flatten)
-        gru_1b = GRU(256, return_sequences=True, go_backwards=True, name='gru1_b')(stcnn3_maxpool_flatten)
-        gru1_merged = merge([gru_1, gru_1b], mode='concat', concat_axis=2)
-        #Bi-GRU-2
-        #bigru2 = BiGRU(bigru1, 512)
-        gru_2 = GRU(256, return_sequences=True, name='gru2')(gru1_merged)
-        gru_2b = GRU(256, return_sequences=True, go_backwards=True, name='gru2_b')(gru1_merged)
-        gru2_merged = merge([gru_2, gru_2b], mode='concat', concat_axis=2)
+
+# remove lstm layer for word recognition
+#         #Bi-GRU-1
+#         gru_1 = GRU(256, return_sequences=True, name='gru1')(stcnn3_maxpool_flatten)
+#         gru_1b = GRU(256, return_sequences=True, go_backwards=True, name='gru1_b')(stcnn3_maxpool_flatten)
+#         gru1_merged = merge([gru_1, gru_1b], mode='concat', concat_axis=2)
+#         #Bi-GRU-2
+#         gru_2 = GRU(256, return_sequences=True, name='gru2')(gru1_merged)
+#         gru_2b = GRU(256, return_sequences=True, go_backwards=True, name='gru2_b')(gru1_merged)
+#         gru2_merged = merge([gru_2, gru_2b], mode='concat', concat_axis=2)
+#         li = TimeDistributed(Dense(28))(gru2_merged)
 
         #fc linear layer
-        #li = TimeDistributed(Dense(28))(gru2_merged)
         li = TimeDistributed(Dense(28))(stcnn3_maxpool_flatten)
 
         #flatten and to 0-9
         li_flatten = Flatten()(li)
         fc_clf = Dense(output_dim)(li_flatten)
 
+        #normal loss
         y_pred = Activation('softmax', name='y_pred')(fc_clf)
-        y_pred_1 = Activation('softmax', name='y_pred_1')(li)
-
+        #ctc loss
+        y_pred_1 = TimeDistributed(Activation('softmax', name='y_pred_1'))(li) 
         loss_out = Lambda(self.ctc_lambda_func, output_shape=(1,), name='ctc')([y_pred_1, labels, input_length, label_length])
 
-         
         self.model = Model(input=[input, labels, input_length, label_length], output=[loss_out,y_pred])
 
         if self._complie_on_build:
             optimizer = Adam(lr=0.0001)
             self.model.compile(loss={'ctc': lambda y_true, y_pred: y_pred,'y_pred':'categorical_crossentropy'},
                                 optimizer=optimizer,
-                                loss_weights={'ctc':1., 'y_pred':0.5},
+                                loss_weights={'ctc':1., 'y_pred':1.},
                                 metrics={'y_pred':'accuracy'})
 
     def ctc_lambda_func(self,args):
