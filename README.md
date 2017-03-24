@@ -8,6 +8,8 @@ using keras framework and tensorflow backend.
 preprocess the videos to frames and crop it to lips.(preprocessing codes haven't uploaded yet)
 The dir structure looks like:
 
+
+```
 ./data/GRID/
     lip/
         s1/
@@ -29,7 +31,8 @@ The dir structure looks like:
         s2/align/
                 ...
         ...
-    
+```
+
  
 Dir `./data/GRID/lip/s{i}/{name}` saves the lip sequence pictures of the video with {name} of person s{i}, and dir `./data/GRID/alignments/s{i}/align/{name}.align` is the alignment file correspondingly.
 
