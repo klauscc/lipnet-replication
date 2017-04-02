@@ -47,5 +47,3 @@ python train.py
 the dataset splition and the network is the same as the Deepmind's paper.
 file `gridDataset.py` is the GRID data generator and `model/lipnet.py` is the model.
 
-**the loss is ctc loss, but ctc_decode havent yet implemented. Therefore, when training only loss was presented.**
-
