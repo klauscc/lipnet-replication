@@ -10,8 +10,10 @@ from sklearn.preprocessing import StandardScaler
 import os
 import numpy as np
 from keras.models import load_model
-
-
+from keras.callbacks import Callback
+import itertools
+import cairocffi as cairo
+import editdistance 
 def lipnet(input_dim, output_dim,weights=None):
     input = Input(name='inputs', shape=input_dim)
     labels = Input(name='labels', shape=[output_dim], dtype='float32')
@@ -72,8 +74,9 @@ def lipnet(input_dim, output_dim,weights=None):
     model.compile(loss={'ctc': lambda y_true, y_pred: y_pred},
                         optimizer=optimizer
                         )
+    test_func = K.function([input, K.learning_phase()], [y_pred])
     model.summary()
-    return model
+    return model,test_func
 
 def ctc_lambda_func(args):
      y_pred, labels, input_length, label_length = args
@@ -82,3 +85,54 @@ def ctc_lambda_func(args):
      # tend to be garbage:
      y_pred = y_pred[:, 2:, :]
      return K.ctc_batch_cost(labels, y_pred, input_length, label_length)
+
+def decode_batch(test_func, word_batch):
+    out = test_func([word_batch,0])[0]
+    ret = []
+    for j in range(out.shape[0]):
+        out_best = list(np.argmax(out[j, 2:], 1))
+        out_best = [k for k, g in itertools.groupby(out_best)]
+        # 26 is space, 27 is CTC blank char
+        outstr = ''
+        for c in out_best:
+            if c >= 0 and c < 26:
+                outstr += chr(c + ord('a'))
+            elif c == 26:
+                outstr += ' '
+        ret.append(outstr)
+    return ret
+
+class StatisticCallback(Callback):
+
+    """used to statistic the accuracy after each epoch"""
+
+    def __init__(self, test_func, test_data_gen, test_num):
+        self.test_func = test_func
+        self.test_data_gen=test_data_gen
+        self.test_num = test_num
+        Callback.__init__(self)
+
+    def show_edit_distance(self, num):
+        num_left = num
+        mean_norm_ed = 0.0
+        mean_ed = 0.0
+        result_true=0
+        while num_left > 0:
+            word_batch = next(self.test_data_gen)[0]
+            num_proc = min(word_batch['inputs'].shape[0], num_left)
+            decoded_res = decode_batch(self.test_func, word_batch['inputs'][0:num_proc])
+            for j in range(0, num_proc):
+                edit_dist = editdistance.eval(decoded_res[j], word_batch['source_str'][j])
+                #print decoded_res[j]," | ground truth:", word_batch['source_str'][j]
+                if  decoded_res[j] == word_batch['source_str'][j]:
+                    result_true += 1
+                mean_ed += float(edit_dist)
+                mean_norm_ed += float(edit_dist) / len(word_batch['labels'][j])
+            num_left -= num_proc
+        mean_norm_ed = mean_norm_ed / num
+        mean_ed = mean_ed / num
+        accuracy = float(result_true) / num
+        print('\nOut of %d samples:  Accuracy: %.3f Mean edit distance: %.3f Mean normalized edit distance: %0.3f'
+              % (num, accuracy, mean_ed, mean_norm_ed))
+    def on_epoch_end(self, epoch, logs={}):
+        self.show_edit_distance(self.test_num)

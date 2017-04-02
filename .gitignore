@@ -2,4 +2,8 @@
 *.jpg
 *.bmp
 *.pyc
+*.swp
+*.swo
+*.hdf5
+data/*
 

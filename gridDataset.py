@@ -44,7 +44,7 @@ class GRIDDatasetGenerator():
 
     """
     generate next training batch
-    """    
+    """
     def next_train_batch(self, batch_size):
         nb_iterate = len(self.train_paths) // batch_size
         while True:
@@ -71,19 +71,22 @@ class GRIDDatasetGenerator():
         label = np.zeros([batch_size, self.max_label_length])
         input_length = np.zeros([batch_size, 1])
         label_length = np.zeros([batch_size, 1])
+        source_strs = []
 
         for i in range(batch_size):
             pos = begin+i
-            lip_d, lip_l, lip_label_len = self.readLipSequences(paths[pos])
+            lip_d, lip_l, lip_label_len, source_str = self.readLipSequences(paths[pos])
             data[i] = lip_d
             label[i] = lip_l
-            input_length[i] = self.timespecs - 2 
+            input_length[i] = self.timespecs - 2
             label_length[i] = lip_label_len
+            source_strs.append(source_str)
 
         inputs = {'inputs': data,
                 'labels': label,
                 'input_length': input_length,
-                'label_length': label_length
+                'label_length': label_length,
+                'source_str': source_strs
                 }
         outputs = {'ctc':np.zeros([batch_size])}
         return (inputs, outputs)
@@ -112,7 +115,7 @@ class GRIDDatasetGenerator():
     convert align file to label:
 
     an align file looks like:
-    
+
     ```
     0 23750 sil
     23750 29500 bin
@@ -124,8 +127,7 @@ class GRIDDatasetGenerator():
     53000 74500 sil
     ```
     so the word list is (bin, blue, at, f, two, now) then convert it to interger tuple.
-    The ctc_blank is padded at the begining and ending of the tuple
-    
+
     """
     def convertAlignToLabels(self, align_file):
         with open(align_file,'r') as f:
@@ -133,6 +135,7 @@ class GRIDDatasetGenerator():
             words = []
             frames = []
             sentence_label = []
+            source_str = ''
             for i,line in enumerate(lines):
 
                 #remove first and last SIL word
@@ -143,6 +146,7 @@ class GRIDDatasetGenerator():
 
                 striped_line = line.rstrip()
                 begin,end,word = striped_line.split(' ')
+                source_str += word
                 begin_frame = int(begin) // 1000 - 1
                 end_frame = int(end) // 1000 - 1
                 words.append(self.convertWordToLabel(word, padding_blank=True))
@@ -150,11 +154,12 @@ class GRIDDatasetGenerator():
                 sentence_label.extend(self.convertWordToLabel(word))
                 if i!=len(lines)-1:
                     sentence_label.append(26)
+                    source_str += ' '
             label = np.zeros(self.max_label_length)
             label -= 1
             label[0:len(sentence_label)] = sentence_label
             label_len = len(sentence_label)
-        return (label, label_len, words, frames)
+        return (label, label_len, words, frames, source_str)
 
     """
     load an image and convert each pixel value to range of (-1,1)
@@ -165,11 +170,11 @@ class GRIDDatasetGenerator():
             img = img.convert('L')
         else:
             img = img.convert('RGB')
-        
+
         if target_size:
             img = img.resize((target_size[1],target_size[0]))
         img = np.asarray(img, dtype=float)
-        return self.preprocess_input(img) 
+        return self.preprocess_input(img)
 
     def preprocess_input(self, x):
         x /= 255.
@@ -189,9 +194,9 @@ class GRIDDatasetGenerator():
             img_name = '{}/{}.jpg'.format(lipsequence_dir, i)
             lip_sequence[i,...] = self.load_image(img_name, target_size=self.target_size)
         label_path = self.getAlignmentDirOfPerson(sequence_owner, sequence_name)
-        sentence_label, label_length, words, frames = self.convertAlignToLabels(label_path)
-        return (lip_sequence, sentence_label, label_length)
-    
+        sentence_label, label_length, words, frames, source_str = self.convertAlignToLabels(label_path)
+        return (lip_sequence, sentence_label, label_length, source_str)
+
     def getLipDirOfPerson(self, i):
         return "{}/lip/s{}".format(self.data_root, i)
 
@@ -223,7 +228,7 @@ class GRIDDatasetGenerator():
     """
     def gen_hdf5(self):
         f = h5py.File(self.dataset_path,'w')
-        
+
         #train and test_unseen dataset
         train_lip_paths = self.getLipPaths(self.train_people)
         np.random.shuffle(train_lip_paths)
