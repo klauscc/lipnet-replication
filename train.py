@@ -23,9 +23,10 @@ nb_val_samples = 2850
 train_gen = grid.next_train_batch(batch_size)
 val_gen = grid.next_val_batch(batch_size)
 
-statisticCallback = StatisticCallback(test_func, val_gen, nb_val_samples)
+statisticCallback = StatisticCallback(test_func, log_savepath, val_gen, nb_val_samples, weight_savepath)
 net.fit_generator(generator=train_gen, samples_per_epoch=nb_train_samples,
-                    nb_epoch=nb_epoch, validation_data=val_gen, nb_val_samples=nb_val_samples,
-                    callbacks=[checkpointer, csv, statisticCallback]
-                    #callbacks=[csv, statisticCallback]
+                    nb_epoch=nb_epoch,
+                    #validation_data=val_gen, nb_val_samples=nb_val_samples,
+                    #callbacks=[checkpointer, csv, statisticCallback]
+                    callbacks=[statisticCallback]
                     )

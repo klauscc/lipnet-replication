@@ -74,7 +74,7 @@ def lipnet(input_dim, output_dim,weights=None):
     model.compile(loss={'ctc': lambda y_true, y_pred: y_pred},
                         optimizer=optimizer
                         )
-    test_func = K.function([input, K.learning_phase()], [y_pred])
+    test_func = K.function([input, labels, input_length, label_length, K.learning_phase()], [y_pred, loss_out])
     model.summary()
     return model,test_func
 
@@ -86,8 +86,8 @@ def ctc_lambda_func(args):
      y_pred = y_pred[:, 2:, :]
      return K.ctc_batch_cost(labels, y_pred, input_length, label_length)
 
-def decode_batch(test_func, word_batch):
-    out = test_func([word_batch,0])[0]
+def decode_batch(test_func, input_list):
+    out, loss = test_func(input_list)
     ret = []
     for j in range(out.shape[0]):
         out_best = list(np.argmax(out[j, 2:], 1))
@@ -100,39 +100,116 @@ def decode_batch(test_func, word_batch):
             elif c == 26:
                 outstr += ' '
         ret.append(outstr)
-    return ret
+    return ret, np.mean(loss)
+
+def wer(r, h):
+    """
+    Calculation of WER with Levenshtein distance.
+
+    Works only for iterables up to 254 elements (uint8).
+    O(nm) time ans space complexity.
+
+    Parameters
+    ----------
+    r : list
+    h : list
+
+    Returns
+    -------
+    int
+
+    Examples
+    --------
+    >>> wer("who is there".split(), "is there".split())
+    1
+    >>> wer("who is there".split(), "".split())
+    3
+    >>> wer("".split(), "who is there".split())
+    3
+    """
+    # initialisation
+    import numpy
+    d = numpy.zeros((len(r)+1)*(len(h)+1), dtype=numpy.uint8)
+    d = d.reshape((len(r)+1, len(h)+1))
+    for i in range(len(r)+1):
+        for j in range(len(h)+1):
+            if i == 0:
+                d[0][j] = j
+            elif j == 0:
+                d[i][0] = i
+
+    # computation
+    for i in range(1, len(r)+1):
+        for j in range(1, len(h)+1):
+            if r[i-1] == h[j-1]:
+                d[i][j] = d[i-1][j-1]
+            else:
+                substitution = d[i-1][j-1] + 1
+                insertion    = d[i][j-1] + 1
+                deletion     = d[i-1][j] + 1
+                d[i][j] = min(substitution, insertion, deletion)
+
+    return d[len(r)][len(h)]
 
 class StatisticCallback(Callback):
 
     """used to statistic the accuracy after each epoch"""
 
-    def __init__(self, test_func, test_data_gen, test_num):
+    def __init__(self, test_func, log_savepath,test_data_gen, test_num, checkpoint_dir=None):
         self.test_func = test_func
         self.test_data_gen=test_data_gen
+        self.log_savepath = log_savepath
         self.test_num = test_num
+        self.checkpoint_dir=checkpoint_dir
+        self.best_loss = 10000
         Callback.__init__(self)
+        with open(log_savepath, 'w+') as f:
+            f.write('epoch,loss,val_loss,sentence_error_rate,word_error_rate,character_error_rate,edit_distance\n')
 
-    def show_edit_distance(self, num):
+    def statistic(self, num):
         num_left = num
         mean_norm_ed = 0.0
         mean_ed = 0.0
-        result_true=0
+        word_count = 0
+        word_err_count = 0
+        result_true = 0
+        losses = []
         while num_left > 0:
             word_batch = next(self.test_data_gen)[0]
             num_proc = min(word_batch['inputs'].shape[0], num_left)
-            decoded_res = decode_batch(self.test_func, word_batch['inputs'][0:num_proc])
+            input_list = [word_batch['inputs'][0:num_proc], word_batch['labels'][0:num_proc], word_batch['input_length'][0:num_proc], word_batch['label_length'][0:num_proc], 0]
+            decoded_res, batch_loss = decode_batch(self.test_func, input_list)
+            losses.append(batch_loss)
             for j in range(0, num_proc):
                 edit_dist = editdistance.eval(decoded_res[j], word_batch['source_str'][j])
-                #print decoded_res[j]," | ground truth:", word_batch['source_str'][j]
+
+                #sentense level accuracy
                 if  decoded_res[j] == word_batch['source_str'][j]:
                     result_true += 1
+                #wer
+                reference = word_batch['source_str'][j].split()
+                predicted = decoded_res[j].split()
+                word_count += len(reference)
+                word_err_count += wer(reference, predicted)
+
+                #edit distance
                 mean_ed += float(edit_dist)
                 mean_norm_ed += float(edit_dist) / len(word_batch['labels'][j])
             num_left -= num_proc
-        mean_norm_ed = mean_norm_ed / num
+        mean_norm_ed = mean_norm_ed / num #the same as cer
         mean_ed = mean_ed / num
-        accuracy = float(result_true) / num
-        print('\nOut of %d samples:  Accuracy: %.3f Mean edit distance: %.3f Mean normalized edit distance: %0.3f'
-              % (num, accuracy, mean_ed, mean_norm_ed))
+        ser = float(num-result_true) / num
+        word_error_rate = float(word_err_count) / word_count
+        mean_loss = np.mean(losses)
+        print('\nOut of %d samples: Sentence Error Rate: %.3f WER: %0.3f Mean normalized edit distance(CER): %0.3f Mean edit distance: %.3f loss: %.3f'
+              % (num, ser, word_error_rate, mean_norm_ed, mean_ed, mean_loss))
+        return (num, ser, word_error_rate, mean_norm_ed, mean_ed, mean_loss)
     def on_epoch_end(self, epoch, logs={}):
-        self.show_edit_distance(self.test_num)
+        num, ser, wer, cer, mean_ed, mean_loss = self.statistic(self.test_num)
+        if mean_loss < self.best_loss:
+            if self.checkpoint_dir:
+                print ("\nnew val_loss {} less than previous best val_loss{}, saving weight to {}".format(mean_loss, self.best_loss, self.checkpoint_dir))
+                self.model.save_weights(self.checkpoint_dir)
+            self.best_loss = mean_loss
+        with open(self.log_savepath, "a") as f:
+            f.write("{},{:.5},{:.5},{:.3},{:.3},{:.3},{:.3}\n".format(epoch, logs.get('loss'), mean_loss, ser, wer, cer, mean_ed))
