@@ -1,7 +1,7 @@
 import numpy as np
 import os
 import sys
-from gridDataset import GRIDSingleUserDatasetGenerator 
+from gridDatasetGenerator import GRIDSingleUserDatasetGenerator 
 from model.lipnet import * 
 from keras.callbacks import ModelCheckpoint,CSVLogger
 

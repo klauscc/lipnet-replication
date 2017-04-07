@@ -35,11 +35,8 @@ class GRIDDatasetGenerator(GRIDBaseDataset):
 class GRIDSingleUserDatasetGenerator(GRIDBaseDataset):
     def __init__(self, finetune_person=(1), *args):
         GRIDBaseDataset.__init__(self, *args)
-        self.test_people = test_people
-
 
         self.train_people = finetune_person
-
         print ("fine tune person is {}".format(self.train_people))
         train_lip_paths = self.getLipPaths(self.train_people)
 
