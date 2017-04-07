@@ -1,1 +1,0 @@
-epoch,loss,val_loss,sentence_error_rate,word_error_rate,character_error_rate,edit_distance
