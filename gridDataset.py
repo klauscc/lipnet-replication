@@ -57,14 +57,17 @@ class GRIDDatasetGenerator():
     """
     generate next validation batch
     """
-    def next_val_batch(self, batch_size):
-        nb_iterate = len(self.test_seen_paths) // batch_size
+    def next_val_batch(self, batch_size, test_seen=True):
+        if test_seen:
+            paths = self.test_seen_paths
+        else:
+            paths = self.test_unseen_paths
+
+        nb_iterate = len(paths) // batch_size
         while True:
-            if self.shuffle:
-                np.random.shuffle(self.train_paths)
             for itr in range(nb_iterate):
                 start_pos = itr*batch_size
-                yield self.gen_batch(start_pos, batch_size, self.test_seen_paths)
+                yield self.gen_batch(start_pos, batch_size, paths)
 
     def gen_batch(self, begin, batch_size, paths):
         data = np.zeros([batch_size, self.timespecs, self.target_size[0], self.target_size[1], 3])

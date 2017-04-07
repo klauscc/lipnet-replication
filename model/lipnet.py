@@ -88,17 +88,32 @@ def ctc_lambda_func(args):
 
 def decode_batch(test_func, input_list):
     out, loss = test_func(input_list)
+
+    # y_pred = K.placeholder(shape=[out.shape[0],73,28])
+    # input_length_value = np.zeros(out.shape[0])
+    # input_length_value[:] = 73
+    # input_length = K.placeholder(shape=[out.shape[0]])
+    # decoder = K.ctc_decode(y_pred, input_length, greedy=True)
+    # decoded = K.get_session().run(decoder, feed_dict={y_pred:out[:,2:], input_length: input_length_value})[0][0]
     ret = []
     for j in range(out.shape[0]):
         out_best = list(np.argmax(out[j, 2:], 1))
         out_best = [k for k, g in itertools.groupby(out_best)]
         # 26 is space, 27 is CTC blank char
         outstr = ''
+        # outstr1= ''
+        # for c in decoded[j]:
+            # if c >= 0 and c < 26:
+                # outstr1 += chr(c + ord('a'))
+            # elif c == 26:
+                # outstr1 += ' '
+
         for c in out_best:
             if c >= 0 and c < 26:
                 outstr += chr(c + ord('a'))
             elif c == 26:
                 outstr += ' '
+        #print outstr, " ",outstr1
         ret.append(outstr)
     return ret, np.mean(loss)
 
@@ -184,6 +199,7 @@ class StatisticCallback(Callback):
                 edit_dist = editdistance.eval(decoded_res[j], word_batch['source_str'][j])
 
                 #sentense level accuracy
+                #print(decoded_res[j], "| ground true: ",word_batch['source_str'][j] )
                 if  decoded_res[j] == word_batch['source_str'][j]:
                     result_true += 1
                 #wer
