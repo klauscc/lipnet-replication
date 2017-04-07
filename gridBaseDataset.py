@@ -5,8 +5,8 @@ import keras.backend as K
 import glob
 from PIL import Image as pil_image
 
-class GRIDDatasetGenerator():
-    def __init__(self, target_size=[50,100], shuffle=True, re_generate=False ,data_dir='./data/GRID', dst_path='./data/grid_hkl/GRID.h5', test_people=(1,2,20,22)):
+class GRIDBaseDataset():
+    def __init__(self, target_size=[50,100], shuffle=True, re_generate=False ,data_dir='./data/GRID', dst_path='./data/grid_hkl/GRID.h5'):
         self.data_root = data_dir
         self.lip_dir = data_dir+'/lip'
         self.label_dir = data_dir+'/alignments'
@@ -15,7 +15,6 @@ class GRIDDatasetGenerator():
         self.timespecs = 75
         self.ctc_blank = 27
         self.target_size = target_size
-        self.test_people = test_people
         self.max_label_length = 50
         self.shuffle=shuffle
 
@@ -25,22 +24,6 @@ class GRIDDatasetGenerator():
         self.train_paths = None
         self.test_seen_paths = None
         self.test_unseen_paths = None
-
-        self.train_people = []
-        for p in range(1,35):
-            if p not in test_people:
-                self.train_people.append(p)
-
-        train_lip_paths = self.getLipPaths(self.train_people)
-        np.random.shuffle(train_lip_paths)
-        train_n = len(train_lip_paths)
-        split = 0.9
-        train_num = int(train_n *split)
-        test_unseen_paths = self.getLipPaths(self.test_people)
-
-        self.train_paths=train_lip_paths[0:train_num]
-        self.test_seen_paths=train_lip_paths[train_num:]
-        self.test_unseen_paths=test_unseen_paths
 
     """
     generate next training batch
