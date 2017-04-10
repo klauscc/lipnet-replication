@@ -33,15 +33,16 @@ class GRIDDatasetGenerator(GRIDBaseDataset):
         self.test_unseen_paths=test_unseen_paths
 
 class GRIDSingleUserDatasetGenerator(GRIDBaseDataset):
-    def __init__(self, finetune_person=(1), *args):
+    def __init__(self, finetune_person=1, *args):
         GRIDBaseDataset.__init__(self, *args)
 
-        self.train_people = finetune_person
+        self.train_people = []
+        self.train_people.append(finetune_person)
         print ("fine tune person is {}".format(self.train_people))
         train_lip_paths = self.getLipPaths(self.train_people)
 
         train_n = len(train_lip_paths)
-        split = 0.4
+        split = 0.9
         train_num = int(train_n *split)
         self.train_paths=train_lip_paths[0:train_num]
         self.test_seen_paths=train_lip_paths[train_num:]
@@ -49,6 +50,6 @@ class GRIDSingleUserDatasetGenerator(GRIDBaseDataset):
         default_unseen_people = (1,2,20,22)
         self.test_people = []
         for i in default_unseen_people:
-            if i not in finetune_person:
+            if i != finetune_person:
                 self.test_people.append(i)
         self.test_unseen_paths = self.getLipPaths(self.test_people)
