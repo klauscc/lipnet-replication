@@ -5,7 +5,7 @@ import keras.backend as K
 import glob
 from PIL import Image as pil_image
 
-class GRIDBaseDataset():
+class GRIDBaseDataset(object):
     def __init__(self, target_size=[50,100], shuffle=True, re_generate=False ,data_dir='./data/GRID', dst_path='./data/grid_hkl/GRID.h5'):
         self.data_root = data_dir
         self.lip_dir = data_dir+'/lip'

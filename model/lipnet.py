@@ -21,7 +21,7 @@ def lipnet(input_dim, output_dim,weights=None):
     label_length = Input(name='label_length', shape=[1], dtype='int64')
 
     #STCNN-1
-    stcnn1_padding = ZeroPadding3D(padding=(1,2,2), input_shape = input_dim)(input)
+    stcnn1_padding = ZeroPadding3D(padding=(1,2,2), input_shape = input_dim)(input) 
     stcnn1_convolution = Convolution3D(32, 3, 5, 5, subsample=(1,2,2))(stcnn1_padding)
     stcnn1_bn = BatchNormalization()(stcnn1_convolution)
     stcnn1_acti = Activation('relu')(stcnn1_bn)
