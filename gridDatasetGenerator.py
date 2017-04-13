@@ -8,8 +8,8 @@ from gridBaseDataset import GRIDBaseDataset
 from preprocessing.image_sequence import *
 
 class GRIDDatasetGenerator(GRIDBaseDataset):
-    def __init__(self, test_people=(1,2,20,22), *args):
-        GRIDBaseDataset.__init__(self, *args)
+    def __init__(self, test_people=(1,2,20,22), *args, **kwargs):
+        GRIDBaseDataset.__init__(self, *args, **kwargs)
         self.test_people = test_people
 
 
@@ -70,3 +70,8 @@ class GRIDSingleUserDatasetGenerator(GRIDBaseDataset):
             if i != finetune_person:
                 self.test_people.append(i)
         self.test_unseen_paths = self.getLipPaths(self.test_people)
+
+if __name__ == '__main__':
+    grid = GRIDDatasetGenerator()
+    batch_size=100
+    next(grid.next_val_batch(batch_size))

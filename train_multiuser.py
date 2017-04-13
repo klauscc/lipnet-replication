@@ -4,13 +4,15 @@ import sys
 from gridDatasetGenerator import GRIDDatasetGenerator 
 from model.lipnet import * 
 from keras.callbacks import ModelCheckpoint,CSVLogger
+from time import gmtime, strftime
 
 
 batch_size = 50
 nb_epoch = 500
-weight_savepath = './data/checkpoints/lipnet_weights_multiuser.hdf5'
-log_savepath='./data/logs/lipnet_loss_seen_multiuser.csv'
-log_savepath_unseen = './data/logs/lipnet_loss_unseen_multiuser.csv'
+weight_savepath = './data/checkpoints/lipnet_weights_multiuser_with_genwords.hdf5'
+timestamp=strftime("%Y_%m_%d__%H_%M_%S",gmtime())
+log_savepath='./data/logs/lipnet_loss_seen_multiuser_{}.csv'.format(timestamp)
+log_savepath_unseen = './data/logs/lipnet_loss_unseen_multiuser_{}.csv'.format(timestamp)
 
 grid = GRIDDatasetGenerator()
 net,test_func = lipnet(input_dim=grid.input_dim, output_dim=grid.output_dim, weights = weight_savepath)

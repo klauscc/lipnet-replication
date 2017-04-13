@@ -5,8 +5,10 @@ import keras.backend as K
 import glob
 from PIL import Image as pil_image
 
+
+
 class GRIDBaseDataset(object):
-    def __init__(self, target_size=[50,100], shuffle=True, re_generate=False ,data_dir='./data/GRID', dst_path='./data/grid_hkl/GRID.h5'):
+    def __init__(self, target_size=[50,100], shuffle=True, re_generate=False, data_dir='./data/GRID', dst_path='./data/grid_hkl/GRID.h5'):
         self.data_root = data_dir
         self.lip_dir = data_dir+'/lip'
         self.label_dir = data_dir+'/alignments'
@@ -28,19 +30,19 @@ class GRIDBaseDataset(object):
     """
     generate next training batch
     """
-    def next_train_batch(self, batch_size):
+    def next_train_batch(self, batch_size, gen_words=True):
         nb_iterate = len(self.train_paths) // batch_size
         while True:
             if self.shuffle:
                 np.random.shuffle(self.train_paths)
             for itr in range(nb_iterate):
                 start_pos = itr*batch_size
-                yield self.gen_batch(start_pos, batch_size, self.train_paths)
+                yield self.gen_batch(start_pos, batch_size, self.train_paths, gen_words=gen_words)
 
     """
     generate next validation batch
     """
-    def next_val_batch(self, batch_size, test_seen=True):
+    def next_val_batch(self, batch_size, test_seen=True, gen_words=False):
         if test_seen:
             paths = self.test_seen_paths
         else:
@@ -50,9 +52,9 @@ class GRIDBaseDataset(object):
         while True:
             for itr in range(nb_iterate):
                 start_pos = itr*batch_size
-                yield self.gen_batch(start_pos, batch_size, paths)
+                yield self.gen_batch(start_pos, batch_size, paths, gen_words=gen_words)
 
-    def gen_batch(self, begin, batch_size, paths):
+    def gen_batch(self, begin, batch_size, paths,gen_words):
         data = np.zeros([batch_size, self.timespecs, self.target_size[0], self.target_size[1], 3])
         label = np.zeros([batch_size, self.max_label_length])
         input_length = np.zeros([batch_size, 1])
@@ -61,7 +63,8 @@ class GRIDBaseDataset(object):
 
         for i in range(batch_size):
             pos = begin+i
-            lip_d, lip_l, lip_label_len, source_str = self.readLipSequences(paths[pos])
+            lip_d, lip_l, lip_label_len, source_str = self.readLipSequences(paths[pos], gen_words=gen_words)
+            # print (lip_l, lip_label_len, source_str)
             data[i] = lip_d
             label[i] = lip_l
             input_length[i] = self.timespecs - 2
@@ -86,15 +89,10 @@ class GRIDBaseDataset(object):
     example:
     one -> (14, 13, 4)
     """
-    def convertWordToLabel(self, string, padding_blank=False):
-        if padding_blank:
-            label = [self.ctc_blank]
-        else:
-            label = []
+    def convertWordToLabel(self, string):
+        label = []
         for char in string:
             label.append(ord(char) - ord('a'))
-        if padding_blank:
-            label.append(self.ctc_blank)
         return label
 
     """
@@ -114,14 +112,23 @@ class GRIDBaseDataset(object):
     ```
     so the word list is (bin, blue, at, f, two, now) then convert it to interger tuple.
 
+    @return
+    the returned tuple has four elements, each of which is a list. The first element of the list is the whole sentence, and the following are single words.
+    labels: each element is an integer array
+    labels_len: each element is the length of the label length
+    source_strs: the original word
+    frames: the frame begin and end
+
     """
     def convertAlignToLabels(self, align_file):
         with open(align_file,'r') as f:
             lines = f.readlines()
             words = []
-            frames = []
+            frames = [[0,self.timespecs-1]]
             sentence_label = []
+            source_strs_of_words = []
             source_str = ''
+            source_strs = []
             for i,line in enumerate(lines):
 
                 #remove first and last SIL word
@@ -133,19 +140,26 @@ class GRIDBaseDataset(object):
                 striped_line = line.rstrip()
                 begin,end,word = striped_line.split(' ')
                 source_str += word
-                begin_frame = int(begin) // 1000 - 1
-                end_frame = int(end) // 1000 - 1
-                words.append(self.convertWordToLabel(word, padding_blank=True))
+                words.append(word)
+                begin_frame = int(begin) // 1000
+                end_frame = int(end) // 1000
                 frames.append([begin_frame, end_frame])
                 sentence_label.extend(self.convertWordToLabel(word))
-                if i!=len(lines)-1:
+                if i!=len(lines)-2:
                     sentence_label.append(26)
                     source_str += ' '
-            label = np.zeros(self.max_label_length)
-            label -= 1
-            label[0:len(sentence_label)] = sentence_label
-            label_len = len(sentence_label)
-        return (label, label_len, words, frames, source_str)
+
+            labels = np.zeros([len(words)+1, self.max_label_length])-1
+            labels_len = np.zeros(len(words)+1)
+            labels[0, 0:len(sentence_label)] = sentence_label
+            labels_len[0] = len(sentence_label)
+            source_strs.append(source_str)
+            for i,w in enumerate(words):
+                labels[i+1,0:len(w)] = self.convertWordToLabel(w)
+                labels_len[i+1] = len(w)
+                source_strs.append(w)
+
+        return (labels, labels_len, source_strs, frames)
 
     """
     load an image and convert each pixel value to range of (-1,1)
@@ -171,17 +185,30 @@ class GRIDBaseDataset(object):
     """
     read a lip sequence to numpy array
     """
-    def readLipSequences(self, lipsequence_dir):
+    def readLipSequences(self, lipsequence_dir, gen_words):
         total = len(sum([i[2] for i in os.walk(lipsequence_dir)],[]))
+
         sequence_name = lipsequence_dir.split('/')[-1]
         sequence_owner = lipsequence_dir.split('/')[-2]
         lip_sequence = np.zeros([self.timespecs, self.target_size[0], self.target_size[1], 3])
-        for i in range(total):
-            img_name = '{}/{}.jpg'.format(lipsequence_dir, i)
-            lip_sequence[i,...] = self.load_image(img_name, target_size=self.target_size)
+        if total < self.timespecs-1:
+            label = np.zeros(self.max_label_length)-1
+            label[0] = self.ctc_blank
+            return (lip_sequence, label, 1, "")
+
+        def read_images(frame_intval):
+            begin_frame, end_frame = frame_intval
+            for i in range(begin_frame, end_frame):
+                img_name = '{}/{}.jpg'.format(lipsequence_dir, i)
+                lip_sequence[i-begin_frame,...] = self.load_image(img_name, target_size=self.target_size)
+
         label_path = self.getAlignmentDirOfPerson(sequence_owner, sequence_name)
-        sentence_label, label_length, words, frames, source_str = self.convertAlignToLabels(label_path)
-        return (lip_sequence, sentence_label, label_length, source_str)
+        labels, labels_len, source_strs, frames = self.convertAlignToLabels(label_path)
+        i = 0
+        if gen_words and np.random.rand() < 0.5:
+            i = np.random.randint(len(frames))
+        read_images(frames[i])
+        return (lip_sequence, labels[i], labels_len[i],source_strs[i])
 
     def getLipDirOfPerson(self, i):
         return "{}/lip/s{}".format(self.data_root, i)
@@ -205,9 +232,7 @@ class GRIDBaseDataset(object):
         dset_label = f.create_dataset(dset_data_name,(train_num, self.max_label_length))
         for i, path in enumerate(lip_paths):
             print "generating '{}'...".format(path)
-            data, label = self.readLipSequences(path)
-            dset_data[i,...] = data
-            dset_label[i,...] = label
+            #todo
     """
     save all the samples to a hdf5 file
     the disadvantage is samples cannot shuffle at each epoch

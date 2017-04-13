@@ -60,11 +60,11 @@ class ImageSequenceGenerator(object):
         #nshwc
         data_x = inputs[x_key]
         n,s,h,w,c = data_x.shape
-        # for i in range(n):
-            # for j in range(s):
-                # data_x[i,j,...] = self.standarize(data_x[i,j,...])
+        for i in range(n):
+            for j in range(s):
+                data_x[i,j,...] = self.standarize(data_x[i,j,...])
             #perframe deletion or duplication by rate 0.05
             #data_x[i,...] = self.random_deletion_duplication_frame(data_x[i,...])
             #randomly horizonal flip
-            #data_x[i,...] = self.random_horizonal_flip(data_x[i,...])
+            data_x[i,...] = self.random_horizonal_flip(data_x[i,...])
         return (inputs, outputs)
