@@ -41,13 +41,13 @@ class GRIDDatasetGenerator(GRIDBaseDataset):
         self.imageSequenceGenerator = ImageSequenceGenerator()
         self.imageSequenceGenerator.fit_generator(super(GRIDDatasetGenerator,self).next_train_batch(50), train_num//50)
 
-    def next_train_batch(self, batch_size):
+    def next_train_batch(self, batch_size,gen_words=True):
         while 1:
-            yield self.imageSequenceGenerator.flow(super(GRIDDatasetGenerator, self).next_train_batch(batch_size))
+            yield self.imageSequenceGenerator.flow(super(GRIDDatasetGenerator, self).next_train_batch(batch_size, gen_words=gen_words))
 
-    def next_val_batch(self, batch_size, test_seen=True):
+    def next_val_batch(self, batch_size, test_seen=True, gen_words=False):
         while 1:
-            yield self.imageSequenceGenerator.flow(super(GRIDDatasetGenerator, self).next_val_batch(batch_size,test_seen))
+            yield self.imageSequenceGenerator.flow(super(GRIDDatasetGenerator, self).next_val_batch(batch_size,test_seen, gen_words=gen_words))
 
 class GRIDSingleUserDatasetGenerator(GRIDBaseDataset):
     def __init__(self, finetune_person=1, *args):
