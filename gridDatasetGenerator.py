@@ -72,6 +72,9 @@ class GRIDSingleUserDatasetGenerator(GRIDBaseDataset):
         self.test_unseen_paths = self.getLipPaths(self.test_people)
 
 if __name__ == '__main__':
-    grid = GRIDDatasetGenerator()
+    grid = GRIDDatasetGenerator(debug=True)
     batch_size=100
+    print ('gen a train batch.........')
+    next(grid.next_train_batch(batch_size))
+    print ('gen a val batch.........')
     next(grid.next_val_batch(batch_size))

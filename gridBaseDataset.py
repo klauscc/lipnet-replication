@@ -8,7 +8,7 @@ from PIL import Image as pil_image
 
 
 class GRIDBaseDataset(object):
-    def __init__(self, target_size=[50,100], shuffle=True, re_generate=False, data_dir='./data/GRID', dst_path='./data/grid_hkl/GRID.h5'):
+    def __init__(self, target_size=[50,100], shuffle=True, re_generate=False, data_dir='./data/GRID', dst_path='./data/grid_hkl/GRID.h5', debug=False):
         self.data_root = data_dir
         self.lip_dir = data_dir+'/lip'
         self.label_dir = data_dir+'/alignments'
@@ -22,6 +22,8 @@ class GRIDBaseDataset(object):
 
         self.input_dim = (self.timespecs, target_size[0], target_size[1], 3)
         self.output_dim = (self.max_label_length)
+
+        self.debug = debug
 
         self.train_paths = None
         self.test_seen_paths = None
@@ -64,7 +66,8 @@ class GRIDBaseDataset(object):
         for i in range(batch_size):
             pos = begin+i
             lip_d, lip_l, lip_label_len, source_str = self.readLipSequences(paths[pos], gen_words=gen_words)
-            # print (lip_l, lip_label_len, source_str)
+            if self.debug:
+                print (lip_l, lip_label_len, source_str)
             data[i] = lip_d
             label[i] = lip_l
             input_length[i] = self.timespecs - 2
@@ -81,8 +84,7 @@ class GRIDBaseDataset(object):
         return (inputs, outputs)
 
     """
-    convert a word comprised of characters to an tuple of integer
-    a -> 0
+    convert a word comprised of characters to an tuple of integer a -> 0
     b -> 1
     z -> 25
 
@@ -92,7 +94,10 @@ class GRIDBaseDataset(object):
     def convertWordToLabel(self, string):
         label = []
         for char in string:
-            label.append(ord(char) - ord('a'))
+            if char == ' ':
+                label.append(26)
+            else:
+                label.append(ord(char) - ord('a'))
         return label
 
     """
@@ -140,14 +145,16 @@ class GRIDBaseDataset(object):
                 striped_line = line.rstrip()
                 begin,end,word = striped_line.split(' ')
                 source_str += word
-                words.append(word)
+                sentence_label.extend(self.convertWordToLabel(word))
                 begin_frame = int(begin) // 1000
                 end_frame = int(end) // 1000
                 frames.append([begin_frame, end_frame])
-                sentence_label.extend(self.convertWordToLabel(word))
                 if i!=len(lines)-2:
                     sentence_label.append(26)
                     source_str += ' '
+
+                word = ' ' + word + ' '
+                words.append(word)
 
             labels = np.zeros([len(words)+1, self.max_label_length])-1
             labels_len = np.zeros(len(words)+1)
@@ -205,7 +212,7 @@ class GRIDBaseDataset(object):
         label_path = self.getAlignmentDirOfPerson(sequence_owner, sequence_name)
         labels, labels_len, source_strs, frames = self.convertAlignToLabels(label_path)
         i = 0
-        if gen_words and np.random.rand() < 0.5:
+        if gen_words and np.random.rand() < 0.3:
             i = np.random.randint(len(frames))
         read_images(frames[i])
         return (lip_sequence, labels[i], labels_len[i],source_strs[i])

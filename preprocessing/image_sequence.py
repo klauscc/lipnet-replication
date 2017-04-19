@@ -20,8 +20,7 @@ class ImageSequenceGenerator(object):
         x_mean = 0.
         xsquare_mean = 0.
         for i in tqdm(range(steps)):
-            #nshwc
-            x = next(batch_generator)[0].get('inputs')
+            #nshwc x = next(batch_generator)[0].get('inputs')
             x_mean += 1. / (i+1) * (np.mean(x, axis=(0,1,2,3))-x_mean)
             xsquare_mean += 1. / (i+1) * (np.mean(x**2, axis=(0,1,2,3)) - xsquare_mean)
         self.mean = x_mean
@@ -60,11 +59,11 @@ class ImageSequenceGenerator(object):
         #nshwc
         data_x = inputs[x_key]
         n,s,h,w,c = data_x.shape
-        for i in range(n):
-            for j in range(s):
-                data_x[i,j,...] = self.standarize(data_x[i,j,...])
+        # for i in range(n):
+            # for j in range(s):
+                # data_x[i,j,...] = self.standarize(data_x[i,j,...])
             #perframe deletion or duplication by rate 0.05
             #data_x[i,...] = self.random_deletion_duplication_frame(data_x[i,...])
             #randomly horizonal flip
-            data_x[i,...] = self.random_horizonal_flip(data_x[i,...])
+            # data_x[i,...] = self.random_horizonal_flip(data_x[i,...])
         return (inputs, outputs)
