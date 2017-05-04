@@ -6,3 +6,4 @@
 *.swo
 *.hdf5
 *.csv
+*.npy

@@ -17,10 +17,11 @@ class ImageSequenceGenerator(object):
             self.mean = mean
             self.std = std 
             return
-        x_mean = 0.
-        xsquare_mean = 0.
+        x_mean = [0.,0., 0.]
+        xsquare_mean = [0.,0., 0.]
         for i in tqdm(range(steps)):
-            #nshwc x = next(batch_generator)[0].get('inputs')
+            #nshwc 
+            x = next(batch_generator)[0].get('inputs')
             x_mean += 1. / (i+1) * (np.mean(x, axis=(0,1,2,3))-x_mean)
             xsquare_mean += 1. / (i+1) * (np.mean(x**2, axis=(0,1,2,3)) - xsquare_mean)
         self.mean = x_mean

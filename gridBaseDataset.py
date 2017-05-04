@@ -14,7 +14,7 @@ class GRIDBaseDataset(object):
         self.label_dir = data_dir+'/alignments'
         self.dataset_path = dst_path
         self.re_generate = re_generate
-        self.timespecs = 75
+        self.timespecs = 74
         self.ctc_blank = 27
         self.target_size = target_size
         self.max_label_length = 50
