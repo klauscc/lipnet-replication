@@ -41,7 +41,7 @@ Dir `./data/GRID/lip/s{i}/{name}` saves the lip sequence pictures of the video w
 ###2. train
 
 ```
-python train.py
+python train_multiuser.py
 ```
 
 the dataset splition and the network is the same as the Deepmind's paper.

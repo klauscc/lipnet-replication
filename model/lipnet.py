@@ -1,5 +1,6 @@
 from keras.models import Sequential,Model
-from keras.layers import Input, Dense, Activation, Dropout, Conv3D, MaxPooling3D, Flatten,ZeroPadding3D, TimeDistributed, SpatialDropout3D,BatchNormalization,Lambda,GRU,merge,SpatialDropout1D
+from keras.layers import Input, Dense, Activation, Dropout, Conv3D, MaxPooling3D, Flatten,ZeroPadding3D, TimeDistributed, SpatialDropout3D,BatchNormalization,Lambda,GRU,SpatialDropout1D
+from keras.layers import concatenate
 from keras.preprocessing.image import ImageDataGenerator
 from keras.utils import np_utils
 from keras.optimizers import Adam
@@ -55,13 +56,13 @@ def lipnet(input_dim, output_dim,weights=None):
     #Bi-GRU-1
     gru_1 = GRU(256, return_sequences=True, name='gru1')(stcnn3_maxpool_flatten)
     gru_1b = GRU(256, return_sequences=True, go_backwards=True, name='gru1_b')(stcnn3_maxpool_flatten)
-    gru1_merged = merge([gru_1, gru_1b], mode='concat', concat_axis=2)
+    gru1_merged = concatenate([gru_1, gru_1b], axis=2)
     #gru1_dropped = SpatialDropout1D(0.5)(gru1_merged)
     gru1_dropped = gru1_merged
     #Bi-GRU-2
     gru_2 = GRU(256, return_sequences=True, name='gru2')(gru1_dropped)
     gru_2b = GRU(256, return_sequences=True, go_backwards=True, name='gru2_b')(gru1_dropped)
-    gru2_merged = merge([gru_2, gru_2b], mode='concat', concat_axis=2)
+    gru2_merged = concatenate([gru_2, gru_2b], axis=2)
     # gru2_dropped = SpatialDropout1D(0.5)(gru2_merged)
     gru2_dropped = gru2_merged
     #fc linear layer
@@ -71,7 +72,7 @@ def lipnet(input_dim, output_dim,weights=None):
     y_pred = TimeDistributed(Activation('softmax', name='y_pred'))(li) 
     loss_out = Lambda(ctc_lambda_func, output_shape=(1,), name='ctc')([y_pred, labels, input_length, label_length])
 
-    model = Model(input=[input, labels, input_length, label_length], output=[loss_out])
+    model = Model(inputs=[input, labels, input_length, label_length], outputs=[loss_out])
     if weights and os.path.isfile(weights):
         model.load_weights(weights)
 
@@ -94,33 +95,35 @@ def ctc_lambda_func(args):
 def decode_batch(test_func, input_list):
     out, loss = test_func(input_list)
 
-    # y_pred = K.placeholder(shape=[out.shape[0],73,28])
-    # input_length_value = np.zeros(out.shape[0])
-    # input_length_value[:] = 73
-    # input_length = K.placeholder(shape=[out.shape[0]])
-    # decoder = K.ctc_decode(y_pred, input_length, greedy=True)
-    # decoded = K.get_session().run(decoder, feed_dict={y_pred:out[:,2:], input_length: input_length_value})[0][0]
-    ret = []
-    for j in range(out.shape[0]):
-        out_best = list(np.argmax(out[j, 2:], 1))
-        out_best = [k for k, g in itertools.groupby(out_best)]
-        # 26 is space, 27 is CTC blank char
-        outstr = ''
-        # outstr1= ''
-        # for c in decoded[j]:
-            # if c >= 0 and c < 26:
-                # outstr1 += chr(c + ord('a'))
-            # elif c == 26:
-                # outstr1 += ' '
+    y_pred = K.placeholder(shape=[out.shape[0],73,28])
+    input_length_value = np.zeros(out.shape[0])
+    input_length_value[:] = 73
+    input_length = K.placeholder(shape=[out.shape[0]])
+    decoder = K.ctc_decode(y_pred, input_length, beam_width=3, greedy=False)
+    decoded = K.get_session().run(decoder, feed_dict={y_pred:out[:,2:], input_length: input_length_value})[0][0]
+    return decoded,np.mean(loss)
 
-        for c in out_best:
-            if c >= 0 and c < 26:
-                outstr += chr(c + ord('a'))
-            elif c == 26:
-                outstr += ' '
-        #print outstr, " ",outstr1
-        ret.append(outstr)
-    return ret, np.mean(loss)
+    # ret = []
+    # for j in range(out.shape[0]):
+        # out_best = list(np.argmax(out[j, 2:], 1))
+        # out_best = [k for k, g in itertools.groupby(out_best)]
+        # # 26 is space, 27 is CTC blank char
+        # outstr = ''
+        # # outstr1= ''
+        # # for c in decoded[j]:
+            # # if c >= 0 and c < 26:
+                # # outstr1 += chr(c + ord('a'))
+            # # elif c == 26:
+                # # outstr1 += ' '
+
+        # for c in out_best:
+            # if c >= 0 and c < 26:
+                # outstr += chr(c + ord('a'))
+            # elif c == 26:
+                # outstr += ' '
+        # #print outstr, " ",outstr1
+        # ret.append(outstr)
+    # return ret, np.mean(loss)
 
 def wer(r, h):
     """

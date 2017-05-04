@@ -75,6 +75,8 @@ if __name__ == '__main__':
     grid = GRIDDatasetGenerator(debug=True)
     batch_size=100
     print ('gen a train batch.........')
-    next(grid.next_train_batch(batch_size))
+    x = True
+    while x:
+        x = next(grid.next_train_batch(batch_size, gen_words=False))
     print ('gen a val batch.........')
     next(grid.next_val_batch(batch_size))
