@@ -4,74 +4,68 @@ import glob
 import re
 from preprocessing.MyImageDataGenerator import MyImageDataGenerator
 from gridBaseDataset import GRIDBaseDataset
+from keras.preprocessing.image import * 
 
 class GRIDPersonAuthentication(GRIDBaseDataset):
     def __init__(self, num_classes = 34, *args, **kwargs):
         GRIDBaseDataset.__init__(self, *args, **kwargs)
 
-        self.timespecs = 1
         self.num_classes = num_classes
         people = np.arange(1,35)
-        self.sample_paths = self.get_sample_paths(people, self.timespecs)
+        self.lip_sequence = self.getLipPaths(people) 
         #fix seed to keep the same splition of train dataset
         np.random.seed(10000)
-        np.random.shuffle(self.sample_paths)
+        np.random.shuffle(self.lip_sequence) 
         np.random.seed()
-        train_n = len(self.sample_paths)
+        train_n = len(self.lip_sequence)
         split_1 = 0.8
         split_2 = 0.9
         train_upper = int(train_n *split_1)
         test_upper = int(train_n * split_2)
 
-        self.train_paths = self.sample_paths[0:train_upper]
-        self.train_num = train_upper
-        self.test_paths = self.sample_paths[train_upper:test_upper]
-        self.test_num = test_upper - train_upper
-        self.val_paths = self.sample_paths[test_upper:]
-        self.val_num = train_n - test_upper
+        self.train_paths = self.get_sample_paths(self.lip_sequence[:train_upper]  ) 
+        self.train_num = len(self.train_paths)  
+        self.test_paths = self.get_sample_paths(self.lip_sequence[train_upper:test_upper]  ) 
+        self.test_num = len(self.test_paths) 
+        self.val_paths = self.get_sample_paths(self.lip_sequence[test_upper:]  ) 
+        self.val_num = len(self.val_paths) 
 
-        self.standarized = False
         self.imageDataGenerator = MyImageDataGenerator(
-            featurewise_center=True ,
+            featurewise_center=False ,
             samplewise_center=False,
-            featurewise_std_normalization=True,
+            featurewise_std_normalization=False,
             samplewise_std_normalization=False,
             zca_whitening=False,
-            rotation_range=5,
-            width_shift_range=0.1,
-            height_shift_range=0.1,
-            shear_range=0.,
-            zoom_range=0.1,
-            channel_shift_range=0.,
-            fill_mode='nearest',
-            horizontal_flip=True,
+            # rotation_range=5,
+            # width_shift_range=0.1,
+            # height_shift_range=0.1,
+            # shear_range=0.,
+            # zoom_range=0.1,
+            # channel_shift_range=0.,
+            # fill_mode='nearest',
+            # horizontal_flip=True,
+            rescale = 1./ 255
                 )
-        self.imageDataGenerator.fit_generator(self.next_batch(batch_size=32, phase="train", shuffle=True), self.train_num // 32)
-        self.standarized = True
+        # self.imageDataGenerator.fit_generator(self.next_batch(batch_size=32, phase="train", shuffle=True), self.train_num // 32)
 
-    def get_sample_paths(self, people, timespec=1, stride=None):
-        paths = self.getLipPaths(people)
+    def get_sample_paths(self, paths, timespec=1, stride=None):
         sample_paths = []
         if not stride:
             stride = timespec
         per_sample = []
         for path in paths:
-            for i in range(0, timespec, stride):
+            for i in range(1, self.timespecs+1, stride):
                 if timespec == 1:
-                    img = '{}/{}.jpg'.format(path, i)
-                    if os.path.isfile(img):
-                        sample_paths.append(img)
+                    img = '{}/{}.jpeg'.format(path, i)
+                    sample_paths.append(img)
                 else:
+                    if i+timespec > self.timespecs:
+                        continue
                     for j in range(i, i+timespec):
-                        img = '{}/{}.jpg'.format(path, j)
-                        if os.path.isfile(img):
-                            per_sample.append(img)
-                        else:
-                            per_sample = []
-                            break
-                    if per_sample != []:
-                        sample_paths.append(per_sample)
-                        per_sample = []
+                        img = '{}/{}.jpeg'.format(path, j)
+                        per_sample.append(img)
+                    sample_paths.append(per_sample)
+                    per_sample = []
         if self.shuffle:
             np.random.shuffle(sample_paths)
         return sample_paths
@@ -86,10 +80,11 @@ class GRIDPersonAuthentication(GRIDBaseDataset):
             x = np.zeros(len(per_sample_path), self.target_size[0], self.target_size[1], 3)
             y[get_y_indice(per_sample_path[0])] = 1
             for i, path in enumerate(per_sample_path):
-                x[i,...] = self.load_image(path, target_size=self.target_size)
+                x[i,...] = img_to_array(load_img(path, target_size=self.target_size))
         else:
-            x = self.load_image(per_sample_path, target_size=self.target_size)
+            x = img_to_array(load_img(per_sample_path, target_size=self.target_size))
             y[get_y_indice(per_sample_path)] = 1
+            x /= 255.
         return x,y
 
     def gen_batch(self, begin, batch_size, paths):
@@ -102,9 +97,11 @@ class GRIDPersonAuthentication(GRIDBaseDataset):
         return (data, label)
 
     def next_batch(self, batch_size, phase, shuffle, random_transform=True):
+        transforming = False
         if phase == 'train':
             paths = self.train_paths
             num_sample = self.train_num
+            transforming = True
         elif phase == 'val':
             paths = self.val_paths
             num_sample = self.val_num
@@ -118,14 +115,11 @@ class GRIDPersonAuthentication(GRIDBaseDataset):
             for itr in range(nb_steps):
                 start_pos = itr*batch_size
                 x,y = self.gen_batch(start_pos, batch_size, paths)
-                x_transoformed = x.copy()
-                if self.standarized == True and random_transform:
-                    for i in range(x.shape[0]):
-                        x_transoformed[i,...] = self.imageDataGenerator.random_transform(x[i,...])
+                # x_transoformed = self.imageDataGenerator.preprocess_batch(x, transforming)
                 if self.debug:
-                    print ("x shape: {}, y shape:{}".format(x_transoformed.shape, y))
+                    print ("x shape: {}, y shape:{}".format(x.shape, y.shape))
                     print (x_transoformed[0], y[0])
-                yield x_transoformed,y
+                yield x,y
 
 if __name__ == "__main__":
     gridPersonDatabase = GRIDPersonAuthentication( debug = True)

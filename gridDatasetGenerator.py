@@ -17,6 +17,8 @@ class GRIDDatasetGenerator(GRIDBaseDataset):
         for p in range(1,35):
             if p not in test_people:
                 self.train_people.append(p)
+        #only train 10 persons
+        self.train_people = self.train_people[0:20]
 
         print ("train_people:{} test_people: {}".format(self.train_people, self.test_people))
         train_lip_paths = self.getLipPaths(self.train_people)
@@ -39,7 +41,7 @@ class GRIDDatasetGenerator(GRIDBaseDataset):
         self.test_unssen_num = len(self.test_unseen_paths)
 
         self.imageSequenceGenerator = ImageSequenceGenerator()
-        self.imageSequenceGenerator.fit_generator(super(GRIDDatasetGenerator,self).next_train_batch(50), train_num//50)
+        # self.imageSequenceGenerator.fit_generator(super(GRIDDatasetGenerator,self).next_train_batch(50), train_num//50)
 
     def next_train_batch(self, batch_size,gen_words=True):
         while 1:
@@ -50,18 +52,19 @@ class GRIDDatasetGenerator(GRIDBaseDataset):
             yield self.imageSequenceGenerator.flow(super(GRIDDatasetGenerator, self).next_val_batch(batch_size,test_seen, gen_words=gen_words))
 
 class GRIDSingleUserDatasetGenerator(GRIDBaseDataset):
-    def __init__(self, finetune_person=1, *args):
-        GRIDBaseDataset.__init__(self, *args)
+    def __init__(self, finetune_person=1, *args, **kwargs):
+        GRIDBaseDataset.__init__(self, *args, **kwargs)
 
         self.train_people = []
         self.train_people.append(finetune_person)
         print ("fine tune person is {}".format(self.train_people))
         train_lip_paths = self.getLipPaths(self.train_people)
 
-        train_n = len(train_lip_paths)
-        split = 0.9
-        train_num = int(train_n *split)
-        self.train_paths=train_lip_paths[0:train_num]
+        np.random.shuffle(train_lip_paths) 
+
+        train_num = 400
+
+        self.pos_train_paths=train_lip_paths[0:train_num]
         self.test_seen_paths=train_lip_paths[train_num:]
 
         default_unseen_people = (1,2,20,22)
@@ -75,8 +78,9 @@ if __name__ == '__main__':
     grid = GRIDDatasetGenerator(debug=True)
     batch_size=100
     print ('gen a train batch.........')
-    x = True
-    while x:
-        x = next(grid.next_train_batch(batch_size, gen_words=False))
+    x = next(grid.next_train_batch(batch_size, gen_words=False))
+    print x
     print ('gen a val batch.........')
-    next(grid.next_val_batch(batch_size))
+    x_val = next(grid.next_val_batch(batch_size))
+    print x_val
+

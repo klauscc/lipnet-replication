@@ -59,6 +59,7 @@ class ImageSequenceGenerator(object):
         inputs,outputs = next(generator)
         #nshwc
         data_x = inputs[x_key]
+        data_x /= 255.
         n,s,h,w,c = data_x.shape
         # for i in range(n):
             # for j in range(s):

@@ -4,8 +4,7 @@ import h5py
 import keras.backend as K
 import glob
 from PIL import Image as pil_image
-
-
+from keras.preprocessing.image import *
 
 class GRIDBaseDataset(object):
     def __init__(self, target_size=[50,100], shuffle=True, re_generate=False, data_dir='./data/GRID', dst_path='./data/grid_hkl/GRID.h5', debug=False):
@@ -14,7 +13,7 @@ class GRIDBaseDataset(object):
         self.label_dir = data_dir+'/alignments'
         self.dataset_path = dst_path
         self.re_generate = re_generate
-        self.timespecs = 74
+        self.timespecs = 75
         self.ctc_blank = 27
         self.target_size = target_size
         self.max_label_length = 50
@@ -56,23 +55,37 @@ class GRIDBaseDataset(object):
                 start_pos = itr*batch_size
                 yield self.gen_batch(start_pos, batch_size, paths, gen_words=gen_words)
 
-    def gen_batch(self, begin, batch_size, paths,gen_words):
+    def gen_batch(self, begin, batch_size, paths,gen_words, auth_person=None, scale=1.):
+        def get_y_indice(one_path):
+            match = re.match(r'.*\/s(\d+)\/.*',one_path)
+            return int(match.group(1)) - 1
+
         data = np.zeros([batch_size, self.timespecs, self.target_size[0], self.target_size[1], 3])
         label = np.zeros([batch_size, self.max_label_length])
         input_length = np.zeros([batch_size, 1])
         label_length = np.zeros([batch_size, 1])
         source_strs = []
 
+        if auth_person:
+            y_person = np.zeros([batch_size, 2] ) 
+        else:
+            y_person = np.zeros([batch_size, 34] ) 
+
         for i in range(batch_size):
             pos = begin+i
             lip_d, lip_l, lip_label_len, source_str = self.readLipSequences(paths[pos], gen_words=gen_words)
-            if self.debug:
-                print (lip_l, lip_label_len, source_str)
-            data[i] = lip_d
+            data[i] = lip_d * scale
             label[i] = lip_l
             input_length[i] = self.timespecs - 2
             label_length[i] = lip_label_len
             source_strs.append(source_str)
+            if auth_person:
+                if get_y_indice(paths[pos]) == auth_person-1:
+                    y_person[i,1] = 1
+                else:
+                    y_person[i,0] = 1 
+            else:
+                y_person[i,get_y_indice(paths[pos])] = 1
 
         inputs = {'inputs': data,
                 'labels': label,
@@ -80,7 +93,11 @@ class GRIDBaseDataset(object):
                 'label_length': label_length,
                 'source_str': source_strs
                 }
-        outputs = {'ctc':np.zeros([batch_size])}
+        if auth_person:
+            y_person_name = 'y_person_auth'
+        else:
+            y_person_name = 'y_person'
+        outputs = {'ctc':np.zeros([batch_size]), y_person_name: y_person}
         return (inputs, outputs)
 
     """
@@ -129,7 +146,7 @@ class GRIDBaseDataset(object):
         with open(align_file,'r') as f:
             lines = f.readlines()
             words = []
-            frames = [[0,self.timespecs-1]]
+            frames = [[1,self.timespecs]]
             sentence_label = []
             source_strs_of_words = []
             source_str = ''
@@ -144,10 +161,12 @@ class GRIDBaseDataset(object):
 
                 striped_line = line.rstrip()
                 begin,end,word = striped_line.split(' ')
+                if word == 'sp':
+                    continue
                 source_str += word
                 sentence_label.extend(self.convertWordToLabel(word))
-                begin_frame = int(begin) // 1000
-                end_frame = int(end) // 1000
+                begin_frame = int(begin) // 1000+1
+                end_frame = int(end) // 1000+1
                 frames.append([begin_frame, end_frame])
                 if i!=len(lines)-2:
                     sentence_label.append(26)
@@ -181,13 +200,8 @@ class GRIDBaseDataset(object):
         if target_size:
             img = img.resize((target_size[1],target_size[0]))
         img = np.asarray(img, dtype=float)
-        return self.preprocess_input(img)
+        return img
 
-    def preprocess_input(self, x):
-        x /= 255.
-        x -= 0.5
-        x *= 2.
-        return x
 
     """
     read a lip sequence to numpy array
@@ -205,9 +219,9 @@ class GRIDBaseDataset(object):
 
         def read_images(frame_intval):
             begin_frame, end_frame = frame_intval
-            for i in range(begin_frame, end_frame):
-                img_name = '{}/{}.jpg'.format(lipsequence_dir, i)
-                lip_sequence[i-begin_frame,...] = self.load_image(img_name, target_size=self.target_size)
+            for i in range(begin_frame, end_frame+1):
+                img_name = '{}/{}.jpeg'.format(lipsequence_dir, i)
+                lip_sequence[i-begin_frame,...] = img_to_array(load_img(img_name, target_size=self.target_size))
 
         label_path = self.getAlignmentDirOfPerson(sequence_owner, sequence_name)
         labels, labels_len, source_strs, frames = self.convertAlignToLabels(label_path)

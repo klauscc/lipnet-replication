@@ -27,3 +27,20 @@ class MyImageDataGenerator(ImageDataGenerator):
         self.std = np.sqrt(xsquare_mean - x_mean**2)
         print ("data mean:{}, std:{}".format(self.mean, self.std))
         np.save(save_file, (self.mean, self.std))
+
+    def preprocess(self,x, do_transform=False):
+        if do_transform:
+            y = np.empty_like(x)
+            y = self.random_transform(x)
+            return self.standarized(y)
+        else:
+            return self.standarized(x)
+
+    def preprocess_batch(self,x,do_transform=False):
+        n = x.shape[0]
+        x_preprocessed = np.copy(x)
+        # for i in range(n):
+            # if do_transform: 
+                # x_preprocessed[i,...] = self.random_transform(x[i])
+            # x_preprocessed[i,...] = self.standardize(x_preprocessed[i,...])
+        return x_preprocessed
