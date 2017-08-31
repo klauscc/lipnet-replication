@@ -15,7 +15,7 @@ def ctc_lambda_func(args):
      return K.ctc_batch_cost(labels, y_pred, input_length, label_length)
 
 def decode_batch(test_func, input_list):
-    out, loss = test_func(input_list)
+    out, loss,auth = test_func(input_list)
 
     # using tensorflow ctc decoder
     y_pred = K.placeholder(shape=[out.shape[0],out.shape[1]-2,out.shape[2]])
@@ -47,4 +47,4 @@ def decode_batch(test_func, input_list):
             # elif c == 26:
                 # outstr += ' '
         # ret.append(outstr)
-    return ret, loss
+    return ret, loss, auth

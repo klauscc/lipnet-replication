@@ -87,7 +87,7 @@ class StatisticCallback(Callback):
             word_batch = next(self.test_data_gen)[0]
             num_proc = min(word_batch['inputs'].shape[0], num_left)
             input_list = [word_batch['inputs'][0:num_proc], word_batch['labels'][0:num_proc], word_batch['input_length'][0:num_proc], word_batch['label_length'][0:num_proc], 0]
-            decoded_res, batch_loss = decode_batch(self.test_func, input_list)
+            decoded_res, batch_loss, decoded_auth = decode_batch(self.test_func, input_list)
             batch_loss = np.mean(batch_loss) 
             losses.append(batch_loss)
             for j in range(0, num_proc):

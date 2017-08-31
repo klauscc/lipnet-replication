@@ -55,10 +55,11 @@ class GRIDBaseDataset(object):
                 start_pos = itr*batch_size
                 yield self.gen_batch(start_pos, batch_size, paths, gen_words=gen_words)
 
+    def get_speaker_idx_of_path(self, one_path):
+        match = re.match(r'.*\/s(\d+)\/.*',one_path)
+        return int(match.group(1)) - 1
+
     def gen_batch(self, begin, batch_size, paths,gen_words, auth_person=None, scale=1.):
-        def get_y_indice(one_path):
-            match = re.match(r'.*\/s(\d+)\/.*',one_path)
-            return int(match.group(1)) - 1
 
         data = np.zeros([batch_size, self.timespecs, self.target_size[0], self.target_size[1], 3])
         label = np.zeros([batch_size, self.max_label_length])
@@ -67,9 +68,9 @@ class GRIDBaseDataset(object):
         source_strs = []
 
         if auth_person:
-            y_person = np.zeros([batch_size, 2] ) 
+            y_person = np.zeros([batch_size, self.timespecs, 2] ) 
         else:
-            y_person = np.zeros([batch_size, 34] ) 
+            y_person = np.zeros([batch_size, self.timespecs, 34] ) 
 
         for i in range(batch_size):
             pos = begin+i
@@ -80,12 +81,12 @@ class GRIDBaseDataset(object):
             label_length[i] = lip_label_len
             source_strs.append(source_str)
             if auth_person:
-                if get_y_indice(paths[pos]) == auth_person-1:
-                    y_person[i,1] = 1
+                if self.get_speaker_idx_of_path(paths[pos]) == auth_person-1:
+                    y_person[i,:,1] = 1
                 else:
-                    y_person[i,0] = 1 
+                    y_person[i,:,0] = 1 
             else:
-                y_person[i,get_y_indice(paths[pos])] = 1
+                y_person[i, :, self.get_speaker_idx_of_path(paths[pos])] = 1
 
         inputs = {'inputs': data,
                 'labels': label,
@@ -94,9 +95,9 @@ class GRIDBaseDataset(object):
                 'source_str': source_strs
                 }
         if auth_person:
-            y_person_name = 'y_person_auth'
+            y_person_name = 'y_person_2'
         else:
-            y_person_name = 'y_person'
+            y_person_name = 'y_person_34'
         outputs = {'ctc':np.zeros([batch_size]), y_person_name: y_person}
         return (inputs, outputs)
 
