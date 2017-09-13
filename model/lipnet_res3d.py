@@ -15,7 +15,7 @@ def shared_layers(input_tensor):
     conv1 = Conv3D(32, (3,5,5), strides=(1,2,2), padding= 'same', kernel_initializer="he_normal", kernel_regularizer=kernel_regularizer)(input_tensor) 
     conv2 = basic_block(32)(conv1)
 
-    conv3 = Conv3D(64, (3,5,5), strides=(1,2,2), padding= 'same', kernel_initializer="he_normal", kernel_regularizer=kernel_regularizer)(conv2) 
+    conv3 = Conv3D(64, (3,3,3), strides=(1,2,2), padding= 'same', kernel_initializer="he_normal", kernel_regularizer=kernel_regularizer)(conv2) 
     conv4 = basic_block(64)(conv3)  
 
     conv5 = Conv3D(96, (3,3,3), strides=(1,2,2), padding= 'same', kernel_initializer="he_normal", kernel_regularizer=kernel_regularizer)(conv4) 

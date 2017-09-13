@@ -20,8 +20,9 @@ PREDICT_DICTIONARY  = os.path.join(CURRENT_PATH,'common','dictionaries','grid.tx
 
 class VisualSpeakerAuthentication(object):
     """train, evaluate, predict visual speaker authentication"""
-    lipnet_weight= './data/checkpoints/lipnet_weights_multiuser_with_auth_2017_07_19__07_24_24-{epoch:02d}-{val_loss:.2f}-{val_acc:.4f}.hdf5'
-    lipnet_resed_weight = './data/checkpoints/lipnet_res3d_weights_multiuser_with_auth_2017_08_07__08_20_49-55-1.55408811569-0.00957627118644.hdf5'
+    # lipnet_weight= './data/checkpoints/lipnet_weights_multiuser_with_auth_2017_07_19__07_24_24-{epoch:02d}-{val_loss:.2f}-{val_acc:.4f}.hdf5'
+    # lipnet_resed_weight = './data/checkpoints/lipnet_res3d_weights_multiuser_with_auth_2017_08_07__08_20_49-55-1.55408811569-0.00957627118644.hdf5'
+    lipnet_resed_weight = './data/checkpoints_grid/lipnet_res3d_weights_multiuser_with_auth_2017_09_01__04_44_42-44-2.27469587326-0.0199788135593.hdf5'
     def __init__(self, speaker, liveness_net_weight, lipnet_weight=lipnet_resed_weight, pos_n=25):
         super(VisualSpeakerAuthentication, self).__init__()
         self.speaker = speaker
@@ -48,21 +49,21 @@ class VisualSpeakerAuthentication(object):
     def fit(self, pos_n=25):
         """fit the model"""
         batch_size = 4
-        nb_epoch = 15
+        nb_epoch = 30
         auth_person = self.speaker
         # pos_n = 25
         #generators
         steps = 100 * pos_n // 25
         train_gen = self.data_generator.next_batch(batch_size, phase= 'train', shuffle=True)
-        val_gen = self.data_generator.next_batch(batch_size, phase= 'val', shuffle=False) 
+        val_gen = self.data_generator.next_batch(batch_size, phase= 'test', shuffle=False) 
         #callbacks
         checkpointer = ModelCheckpoint(filepath=self.liveness_net_weight,save_best_only=True,save_weights_only=True, verbose=1, monitor='val_y_person_2_loss')
         # checkpointer = ModelCheckpoint(filepath=self.liveness_net_weight,save_best_only=True,save_weights_only=True, verbose=1, monitor='val_loss')
-        log_savepath='./data/logs/visual_speaker_authentication_speaker_{}.csv'.format(self.speaker)
+        log_savepath='./data/logs_grid/visual_speaker_authentication_speaker_{}.csv'.format(self.speaker)
         statisticCallback = StatisticCallback(self.test_func, log_savepath, val_gen, 200)
         logging.info( 'begin training.......\n steps_per_epoch is {}'.format(steps) ) 
-        self.model.fit_generator(generator=train_gen, steps_per_epoch=pos_n,
-                    nb_epoch=nb_epoch,initial_epoch=0,
+        self.model.fit_generator(generator=train_gen, steps_per_epoch=steps,
+                    epochs=nb_epoch,initial_epoch=0,verbose=1,
                     callbacks=[checkpointer],
                     validation_data=val_gen, validation_steps=200
                     )
@@ -192,7 +193,7 @@ def eval(speaker=25, phase= 'val'):
     batch_size=8
     steps = 225
     threshold = 0.97
-    liveness_net_weight = './data/checkpoints/grid_vsa_speaker_{}.hdf5'.format(speaker) 
+    liveness_net_weight = './data/checkpoints_grid/grid_vsa_speaker_{}.hdf5'.format(speaker) 
     visual_speaker_authentication = VisualSpeakerAuthentication(speaker=speaker, liveness_net_weight=liveness_net_weight, lipnet_weight=None) 
     # visual_speaker_authentication = VisualSpeakerAuthentication(speaker=speaker, liveness_net_weight=liveness_net_weight) 
     val_gen = visual_speaker_authentication.data_generator.next_batch(batch_size, phase= phase, shuffle=False) 
@@ -211,15 +212,15 @@ def eval(speaker=25, phase= 'val'):
             break
     y_prob = np.array(y_prob)
     report = classification_report(y_true, y_pred, digits=4)
-    softmax_save_path = './data/logs/grid_vsa_speaker_{}_softmax_{}.csv'.format(visual_speaker_authentication.speaker, phase) 
+    softmax_save_path = './data/logs_grid/grid_vsa_speaker_{}_softmax_{}.csv'.format(visual_speaker_authentication.speaker, phase) 
     np.savetxt(softmax_save_path, np.c_[y_prob, y_true], fmt= "%.5f", delimiter= ',')
     fpr, tpr, threshold = roc_curve(y_true, y_prob[:,1], drop_intermediate=False)
-    tpr_fpr_save_path = './data/logs/grid_vsa_speaker_{}_tpr_fpr_{}.csv'.format(visual_speaker_authentication.speaker, phase) 
+    tpr_fpr_save_path = './data/logs_grid/grid_vsa_speaker_{}_tpr_fpr_{}.csv'.format(visual_speaker_authentication.speaker, phase) 
     np.savetxt(tpr_fpr_save_path, np.c_[fpr, tpr, threshold], fmt="%.5f", delimiter=',', header='fpr,tpr,threshold')
     print report
 
 def train(speaker=25, pos_n=25):
-    liveness_net_weight = './data/checkpoints/grid_vsa_speaker_{}.hdf5'.format(speaker) 
+    liveness_net_weight = './data/checkpoints_grid/grid_vsa_speaker_{}.hdf5'.format(speaker) 
     visual_speaker_authentication = VisualSpeakerAuthentication(speaker=speaker, liveness_net_weight=liveness_net_weight, pos_n=pos_n) 
     visual_speaker_authentication.fit(pos_n = pos_n) 
 

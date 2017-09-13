@@ -14,12 +14,12 @@ init()
 batch_size = 25
 nb_epoch = 500
 name =  'multiuser_with_auth'
-pre_weights = ''
-initial_epoch = 0
+pre_weights = './data/checkpoints_grid/lipnet_res3d_weights_multiuser_with_auth_2017_08_31__12_30_02-43-2.36135840416-0.0183792372881.hdf5'
+initial_epoch = 44
 timestamp=strftime("%Y_%m_%d__%H_%M_%S",gmtime())
-weight_savepath = './data/checkpoints/lipnet_res3d_32filter_weights_{}_{}.hdf5'.format(name, timestamp)
-log_savepath='./data/logs/lipnet_res3d_32filter_loss_seen_{}_{}.csv'.format(name, timestamp)
-log_savepath_unseen = './data/logs/lipnet_res3d_32filter_loss_unseen_{}_{}.csv'.format(name, timestamp)
+weight_savepath = './data/checkpoints_grid/lipnet_res3d_weights_{}_{}.hdf5'.format(name, timestamp)
+log_savepath='./data/logs/lipnet_res3d_loss_seen_{}_{}.csv'.format(name, timestamp)
+log_savepath_unseen = './data/logs/lipnet_res3d_loss_unseen_{}_{}.csv'.format(name, timestamp)
 
 grid = GRIDDatasetGenerator()
 net,test_func = lipnet_res3d(grid.input_dim, grid.output_dim, weights=None) 

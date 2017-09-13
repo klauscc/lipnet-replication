@@ -64,21 +64,28 @@ class GRIDSinglePersonAuthentication(GRIDBaseDataset):
             raise ValueError( 'phase must be one of {train, val, test}') 
         pos_n  = len(pos_paths) 
         nb_iterate = int(np.ceil(float(len(pos_paths))/(batch_size // 2) ))
+        neg_path_idx = 0
+        neg_path_nums = len(neg_paths) 
         np.random.seed(100)
         while True:
             if self.shuffle:
                 np.random.shuffle(pos_paths)
-                # np.random.shuffle(neg_paths) 
+                np.random.shuffle(neg_paths) 
+            start_pos = 0
             for itr in range(nb_iterate):
-                start_pos = itr*batch_size//2
                 current_batch_size = batch_size
                 if pos_n < start_pos + batch_size//2:
                     current_batch_size = (pos_n - start_pos) * 2
-                paths = []
-                paths.extend(pos_paths[start_pos: start_pos+current_batch_size//2] )
-                paths.extend(np.random.choice(neg_paths, size= current_batch_size // 2, replace=False))
-                logging.debug("iteration: {}. paths:{}".format(itr, paths) ) 
-                input, output = self.gen_batch(0, current_batch_size, paths, gen_words=gen_words, auth_person=self.auth_person, scale=1./255)
+                batch_paths = []
+                batch_paths.extend(pos_paths[start_pos: start_pos+current_batch_size//2] )
+                if neg_path_idx + current_batch_size // 2 > neg_path_nums:
+                    neg_path_idx = 0
+                    if shuffle:
+                        np.random.shuffle(neg_paths) 
+                batch_paths.extend(neg_paths[neg_path_idx: neg_path_idx+current_batch_size//2] )
+                start_pos += current_batch_size // 2
+                neg_path_idx += current_batch_size // 2 
+                input, output = self.gen_batch(0, current_batch_size, batch_paths, gen_words=gen_words, auth_person=self.auth_person, scale=1./255)
                 # if phase == 'train':
                     # data = input[ 'inputs'] 
                     # logging.debug( data.shape)
