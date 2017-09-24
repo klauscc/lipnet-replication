@@ -61,7 +61,7 @@ def build_auth_net_v4(input_dim, output_dim):
     model_auth.compile(optimizer=optimizer, loss='categorical_crossentropy', metrics=['accuracy'])
     return model_auth
 
-def build_auth_net_res_v2(input_dim, output_dim):
+def build_auth_net_res_v2(input_dim, output_dim, viz=False):
     """docstring for build_auth_net_res_v2"""
     kernel_regularizer = l2(1e-4) 
 
@@ -84,7 +84,10 @@ def build_auth_net_res_v2(input_dim, output_dim):
     average_pooling = TimeDistributed(Dropout(0.5) )(average_pooling) 
     hidden_1 = TimeDistributed(Dense(512, kernel_initializer= 'he_normal', activation= 'relu', kernel_regularizer=kernel_regularizer) ) (average_pooling) 
     hidden_1 = TimeDistributed(Dropout(0.5) )(hidden_1) 
-    auth_out = TimeDistributed(Dense(output_dim, kernel_initializer= 'he_normal', activation= 'softmax', kernel_regularizer=kernel_regularizer  ),name= 'y_person_'+str(output_dim) )(hidden_1) #90xoutput_dim
+    if viz:
+        auth_out = TimeDistributed(Dense(output_dim, kernel_initializer= 'he_normal', activation= 'linear', kernel_regularizer=kernel_regularizer  ),name= 'y_person_'+str(output_dim) )(hidden_1) #90xoutput_dim
+    else:
+        auth_out = TimeDistributed(Dense(output_dim, kernel_initializer= 'he_normal', activation= 'softmax', kernel_regularizer=kernel_regularizer  ),name= 'y_person_'+str(output_dim) )(hidden_1) #90xoutput_dim
     model_auth = Model( inputs=input, outputs=auth_out) 
     optimizer = Adam(lr=0.0001)
     model_auth.compile(optimizer=optimizer, loss='categorical_crossentropy', metrics=['accuracy'])
@@ -125,4 +128,3 @@ def shared_layers(input, input_dim):
     #MAXPOOLING-3
     stcnn3_maxpool = MaxPooling3D(pool_size=(1, 2, 2), strides=(1, 2, 2), name= 'shared_layers')(stcnn3_dp)
     return stcnn3_maxpool
-

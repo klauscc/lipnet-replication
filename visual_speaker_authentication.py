@@ -49,13 +49,14 @@ class VisualSpeakerAuthentication(object):
     def fit(self, pos_n=25):
         """fit the model"""
         batch_size = 4
-        nb_epoch = 30
+        nb_epoch = 25
         auth_person = self.speaker
         # pos_n = 25
         #generators
-        steps = 100 * pos_n // 25
+        # steps = 100 * pos_n // 25
+        steps = 100
         train_gen = self.data_generator.next_batch(batch_size, phase= 'train', shuffle=True)
-        val_gen = self.data_generator.next_batch(batch_size, phase= 'test', shuffle=False) 
+        val_gen = self.data_generator.next_batch(batch_size, phase= 'val', shuffle=False) 
         #callbacks
         checkpointer = ModelCheckpoint(filepath=self.liveness_net_weight,save_best_only=True,save_weights_only=True, verbose=1, monitor='val_y_person_2_loss')
         # checkpointer = ModelCheckpoint(filepath=self.liveness_net_weight,save_best_only=True,save_weights_only=True, verbose=1, monitor='val_loss')
@@ -178,7 +179,7 @@ def predict_all(speaker, idx, threshold=0.3):
     target_csv_save_name = os.path.join(CURRENT_PATH, './data/vsa_result/S{}_target_{}.csv'.format(speaker,idx) ) 
     imposter_csv_save_name = os.path.join(CURRENT_PATH, './data/vsa_result/S{}_imposter_{}.csv'.format(speaker, idx) ) 
 
-    liveness_net_weight = './data/checkpoints/grid_vsa_speaker_{}.hdf5'.format(speaker) 
+    liveness_net_weight = './data/checkpoints_grid/grid_vsa_speaker_{}.hdf5'.format(speaker) 
     vsa = VisualSpeakerAuthentication(speaker=speaker, liveness_net_weight=liveness_net_weight, lipnet_weight=None) 
     target_video_paths = vsa.data_generator.pos_test_paths
     imposter_video_paths = vsa.data_generator.neg_test_paths

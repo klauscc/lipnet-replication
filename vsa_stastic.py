@@ -137,11 +137,13 @@ if __name__ == '__main__':
     # idx = '25_1'
     import sys
     speaker = int(sys.argv[1])
-    for n in [100, 200]:
+    # stastic_speaker(speaker, idx='0') 
+    for n in [25, 50, 100, 200]:
+    # for n in [200]:
         ave_result = np.zeros(4) 
-        for idx in [ '{}_{}'.format(n,i) for i in range(1,11) ]: 
-            result = stastic_speaker(speaker, idx, speaker_auth=0.99) 
+        for idx in [ '{}_{}'.format(n,i) for i in range(1,6) ]: 
+            result = stastic_speaker(speaker, idx, speaker_auth=0.97) 
             for i in range(4):
                 ave_result[i] += result[2+3*i]  
-        ave_result /= 10
+        ave_result /= 5
         print( 'speaker {} training sample {}: {}'.format(speaker, n, ave_result) ) 

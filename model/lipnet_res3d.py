@@ -22,7 +22,14 @@ def shared_layers(input_tensor):
     conv6 = basic_block(96)(conv5)  
     return conv6
 
-def auth_net(input_tensor, speaker):
+def auth_net(input_tensor, speaker, viz=False):
+    """
+    the id-net branch of the network
+    Args:
+        input_tensor: 4-d Tensor(n,t,w,h,c). 
+        speaker: bool. the output is total number or the 2.
+        viz: bool. whether the network is used for visualize. If used for visualize, the final layer's activation is changed from softmax to linear
+    """
     if not speaker:
         output_dim = 34
     else:
@@ -36,7 +43,10 @@ def auth_net(input_tensor, speaker):
     average_pooling = TimeDistributed(Dropout(0.5) )(average_pooling) 
     hidden_1 = TimeDistributed(Dense(512, kernel_initializer= 'he_normal', activation= 'relu', kernel_regularizer=kernel_regularizer) ) (average_pooling) 
     hidden_1 = TimeDistributed(Dropout(0.5))(hidden_1) 
-    auth_out = TimeDistributed(Dense(output_dim, kernel_initializer= 'he_normal', activation= 'softmax', kernel_regularizer=kernel_regularizer  ),name= 'y_person_'+str(output_dim) )(hidden_1) #90xoutput_dim
+    if viz:
+        auth_out = TimeDistributed(Dense(output_dim, kernel_initializer= 'he_normal', activation= 'linear', kernel_regularizer=kernel_regularizer  ),name= 'y_person_'+str(output_dim) )(hidden_1) #90xoutput_dim
+    else:
+        auth_out = TimeDistributed(Dense(output_dim, kernel_initializer= 'he_normal', activation= 'softmax', kernel_regularizer=kernel_regularizer  ),name= 'y_person_'+str(output_dim) )(hidden_1) #90xoutput_dim
     return auth_out
 
 def auth_net_res(input_dim, output_dim):
@@ -48,7 +58,7 @@ def auth_net_res(input_dim, output_dim):
     model_auth.compile(optimizer=optimizer, loss='categorical_crossentropy', metrics=['accuracy'])
     return model_auth 
 
-def liveness_net(input_tensor,labels, input_length, label_length ):
+def liveness_net(input_tensor,labels, input_length, label_length, viz=False):
     block_out = SpatialDropout3D(0.5)(input_tensor)  
     pool1 = Conv3D(96, (1,2,2), strides=(1,2,2), kernel_initializer= 'he_normal', padding= 'same', kernel_regularizer=l2(1e-4) )(block_out)
     flatten1 = TimeDistributed( Flatten())(pool1)  
@@ -68,7 +78,11 @@ def liveness_net(input_tensor,labels, input_length, label_length ):
     #fc linear layer
     li = Dense(28, kernel_initializer='he_normal')(gru2_dropped)
     #ctc loss
-    y_pred = TimeDistributed(Activation('softmax'), name='y_pred')(li) 
+    if viz:
+        y_pred = TimeDistributed(Activation('linear'), name='y_pred')(li) 
+    else:
+        y_pred = TimeDistributed(Activation('softmax'), name='y_pred')(li) 
+
 
     loss_out = Lambda(ctc_lambda_func, output_shape=(1,), name='ctc')([y_pred, labels, input_length, label_length])
     return y_pred, loss_out
@@ -92,20 +106,21 @@ def compile_model(model, speaker):
                             metrics= [ 'accuracy'] 
                             )
 
-def lipnet_res3d(input_dim, output_dim, weights, speaker=None):
+def lipnet_res3d(input_dim, output_dim, weights, speaker=None, viz=False):
     input = Input(name= 'inputs', shape=input_dim) 
     labels = Input(name='labels', shape=[output_dim], dtype='float32') 
     input_length = Input(name='input_length', shape=[1], dtype='int64')
     label_length = Input(name='label_length', shape=[1], dtype='int64')
 
     feature = shared_layers(input) 
-    person_auth = auth_net(feature, speaker) 
-    y_pred, ctc_loss = liveness_net(feature, labels, input_length, label_length) 
+    person_auth = auth_net(feature, speaker, viz=viz) 
+    y_pred, ctc_loss = liveness_net(feature, labels, input_length, label_length, viz=viz) 
     model = Model(inputs=[input, labels, input_length, label_length], outputs=[person_auth, ctc_loss]  ) 
     if weights and os.path.isfile(weights):
         model.load_weights(weights, by_name=True)
         logging.info( 'loaded world network weights') 
-    compile_model(model, speaker) 
+    if not viz:
+        compile_model(model, speaker) 
     test_func = K.function([input, labels, input_length, label_length, K.learning_phase()], [y_pred, ctc_loss, person_auth])
     return model,test_func
 
