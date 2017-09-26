@@ -194,7 +194,7 @@ class Authenbase40DataGenerator(object):
             for i in range(self.timespec):
                 frame_path = os.path.join(path, str(i)+ '.bmp') 
                 x = img_to_array(load_img(frame_path, target_size=self.img_size) ) 
-                # if phase == 'train'or phase == 'val':
+            # if phase == 'train'or phase == 'val':
                 np.random.seed(seed) 
                 x = self.augmenter.random_transform(x) 
                 x = self.augmenter.standardize(x) 
